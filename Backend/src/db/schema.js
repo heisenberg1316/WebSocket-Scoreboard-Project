@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, pgEnum, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, timestamp, pgEnum, jsonb, index } from 'drizzle-orm/pg-core';
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished']);
 
@@ -30,7 +30,7 @@ export const commentary = pgTable('commentary', {
     createdAt: timestamp('created_at',  { withTimezone: true }).notNull().defaultNow(),
 },  (table) => {
         return {
-            matchIdIdx: uniqueIndex("idx_commentary_match_id")
+            matchIdIdx: index("idx_commentary_match_id")
                 .on(table.matchId),
         };
     }
