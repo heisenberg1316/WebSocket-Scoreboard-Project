@@ -9,7 +9,6 @@ export const matchRouter = Router();
 
 matchRouter.get("/", async (req, res) => {
     const parsed = listMatchesQuerySchema.safeParse(req.query);
-
     const MAX_LIMIT = 100;
 
     if(!parsed.success){
@@ -30,11 +29,12 @@ matchRouter.get("/", async (req, res) => {
 
 matchRouter.post("/", async (req, res) => {
     const parsed = createMatchSchema.safeParse(req.body);
-    const { data : { startTime, endTime, homeScore, awayScore }} = parsed;
-
+    
     if(!parsed.success){
         return res.status(400).json({error : "Invalid payload", details : JSON.stringify(parsed.error)});
     }
+    
+    const { startTime, endTime, homeScore, awayScore } = parsed.data;
 
     try{
         const [event] = await db.insert(matches).values({
@@ -49,7 +49,8 @@ matchRouter.post("/", async (req, res) => {
         return res.status(201).json({ data : event });
     }
     catch(e){
-        return res.status(500).json({error : "Failed to create match", details : JSON.stringify(e)});
+        console.error("Failed to create match", e);
+        return res.status(500).json({error : "Failed to create match"});
     }
 })
 
