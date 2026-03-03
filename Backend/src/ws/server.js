@@ -33,7 +33,7 @@ export function attachWebSocketServer(server) {
             if (ws.isAlive === false){
                 ws.terminate();
                 return;
-            }
+            } 
 
             ws.isAlive = false;
             ws.ping();
