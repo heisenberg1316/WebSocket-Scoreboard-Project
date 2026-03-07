@@ -157,6 +157,7 @@ export function attachWebSocketServer(server) {
     wss.on('close', () => clearInterval(interval));
 
     function broadcastMatchCreated(match) {
+        console.log("inside braodcast match");
         broadcastToAll(wss, { type: 'match_created', data: match });
     }
 
