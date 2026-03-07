@@ -32,8 +32,14 @@ export interface Commentary {
   createdAt?: string;
 }
 
+
 export interface CommentaryResponse {
   data: Commentary[];
+}
+
+export interface WSMessageMatchCreated {
+  type: "match_created";
+  data: Match;
 }
 
 // WebSocket Message Types
@@ -91,6 +97,7 @@ export interface WSMessageUnsubscribedAll {
 
 export type WSMessage =
   | WSMessageCommentary
+  | WSMessageMatchCreated
   | WSMessageScore
   | WSMessageWelcome
   | WSMessagePong
