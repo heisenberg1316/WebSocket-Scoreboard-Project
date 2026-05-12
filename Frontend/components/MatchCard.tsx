@@ -9,142 +9,241 @@ interface MatchCardProps {
 }
 
 export const MatchCard: React.FC<MatchCardProps> = ({ match, isActive, onWatch, onUnwatch }) => {
-    // Handle case-insensitive status check from API
+
     const statusLower = match.status.toLowerCase();
     const isLive = statusLower === 'live';
+    const isCricket = match.sport.toLowerCase() === 'cricket';
+
+    /* -----------------------------
+       Convert balls → overs
+       ----------------------------- */
+    function getOvers(totalBalls?: number) {
+        if (totalBalls == null) return "0.0";
+
+        const overs = Math.floor(totalBalls / 6);
+        const balls = totalBalls % 6;
+
+        return `${overs}.${balls}`;
+    }
+
+    /* -----------------------------
+       Dynamic score fields
+       ----------------------------- */
+    const homeScore = isCricket ? match.homeRuns : match.homeScore;
+    const awayScore = isCricket ? match.awayRuns : match.awayScore;
+
+    const homeWickets = isCricket ? match.homeWickets : undefined;
+    const awayWickets = isCricket ? match.awayWickets : undefined;
+
+    const homeOvers = isCricket ? getOvers(match.homeTotalBalls) : undefined;
+    const awayOvers = isCricket ? getOvers(match.awayTotalBalls) : undefined;
+
+    /* -----------------------------
+       Score pulse animation
+       ----------------------------- */
     const [homePulse, setHomePulse] = useState(false);
     const [awayPulse, setAwayPulse] = useState(false);
-    const prevScoreRef = useRef({ home: match.homeScore, away: match.awayScore });
-    const pulseTimeoutRef = useRef<{ home?: ReturnType<typeof setTimeout>; away?: ReturnType<typeof setTimeout> }>({});
-    
-    const actionLabel = (() => {
-        if (isLive) {
-            return isActive ? 'Watching Live' : 'Watch Live';
-        }
-        if (statusLower === 'finished') {
-            return isActive ? 'Viewing Recap' : 'View Recap';
-        }
-        return isActive ? 'Viewing Match' : 'View Match';
-    })();
+
+    const prevScoreRef = useRef({
+        home: homeScore,
+        away: awayScore
+    });
+
+    const pulseTimeoutRef = useRef<{ home?: any; away?: any }>({});
 
     useEffect(() => {
-        const prevScore = prevScoreRef.current;
-        const homeChanged = prevScore.home !== match.homeScore;
-        const awayChanged = prevScore.away !== match.awayScore;
 
-        if (homeChanged) {
+        const prev = prevScoreRef.current;
+
+        if (prev.home !== homeScore) {
             setHomePulse(true);
-            if (pulseTimeoutRef.current.home) {
-                clearTimeout(pulseTimeoutRef.current.home);
-            }
-            pulseTimeoutRef.current.home = setTimeout(() => {
-                setHomePulse(false);
-            }, 900);
+            clearTimeout(pulseTimeoutRef.current.home);
+            pulseTimeoutRef.current.home = setTimeout(() => setHomePulse(false), 1000);
         }
 
-        if (awayChanged) {
+        if (prev.away !== awayScore) {
             setAwayPulse(true);
-            if (pulseTimeoutRef.current.away) {
-                clearTimeout(pulseTimeoutRef.current.away);
-            }
-            pulseTimeoutRef.current.away = setTimeout(() => {
-                setAwayPulse(false);
-            }, 900);
+            clearTimeout(pulseTimeoutRef.current.away);
+            pulseTimeoutRef.current.away = setTimeout(() => setAwayPulse(false), 1000);
         }
 
-        prevScoreRef.current = { home: match.homeScore, away: match.awayScore };
-
-        return () => {
-            if (pulseTimeoutRef.current.home) {
-              clearTimeout(pulseTimeoutRef.current.home);
-            }
-            if (pulseTimeoutRef.current.away) {
-              clearTimeout(pulseTimeoutRef.current.away);
-            }
+        prevScoreRef.current = {
+            home: homeScore,
+            away: awayScore
         };
-    }, [match.homeScore, match.awayScore]);
-    
-    // Format status for display (Capitalize first letter)
-    const displayStatus = match.status.charAt(0).toUpperCase() + match.status.slice(1).toLowerCase();
+
+    }, [homeScore, awayScore]);
+
+    /* -----------------------------
+       Score Display Component
+       ----------------------------- */
+    const ScoreDisplay = ({
+        score,
+        wickets,
+        overs,
+        pulse
+    }: {
+        score: number | undefined;
+        wickets?: number;
+        overs?: string;
+        pulse: boolean;
+    }) => {
+
+        if (isCricket) {
+            return (
+                <div className={`flex flex-col transition-all duration-300 ${pulse ? 'scale-110' : ''}`}>
+                    <div className="flex items-baseline gap-1">
+                        <span className={`text-2xl font-black ${pulse ? 'text-red-600' : 'text-black'}`}>
+                            {score ?? 0}
+                        </span>
+
+                        <span className="text-lg font-bold text-gray-500">
+                            /{wickets ?? 0}
+                        </span>
+                    </div>
+
+                    {overs && (
+                        <span className="text-[10px] font-bold uppercase text-gray-400">
+                            ({overs} ov)
+                        </span>
+                    )}
+                </div>
+            );
+        }
+
+        return (
+            <span className={`text-3xl font-black transition-all ${pulse ? 'text-red-600 scale-125' : 'text-black'}`}>
+                {score ?? 0}
+            </span>
+        );
+    };
 
     return (
-      <div className={`
-        relative p-5 rounded-2xl border-2 border-black bg-white transition-all duration-200
-        ${isActive ? 'shadow-hard translate-x-[-2px] translate-y-[-2px] ring-2 ring-brand-yellow ring-offset-2' : 'hover:shadow-hard-sm'}
-      `}>
-        {/* Header: Sport & Status */}
-        <div className="flex justify-between items-start mb-4">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-500 border border-black rounded-full px-2 py-0.5">
-            {match.sport}
-          </span>
-          <div className="flex items-center gap-2">
-            {isLive && (
-              <span className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border border-black"></span>
-              </span>
-            )}
-            <span className={`text-sm font-medium ${isLive ? 'text-red-600' : 'text-gray-600'}`}>
-              {displayStatus}
-            </span>
-          </div>
-        </div>
+        <div
+            className={`
+            relative overflow-hidden rounded-xl border-[3px] border-black bg-white transition-all
+            ${isActive
+                    ? 'shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] -translate-y-1 -translate-x-1'
+                    : 'hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'}
+        `}
+        >
 
-        {/* Teams & Score */}
-        <div className="flex flex-col gap-3 mb-6">
-          <div className="flex justify-between items-center">
-            <span className="font-bold text-lg text-brand-dark line-clamp-1">{match.homeTeam}</span>
-            <span
-              className={`
-                font-bold text-2xl border border-black rounded-lg px-3 py-1 min-w-[3rem] text-center transition-colors
-                ${homePulse ? 'bg-brand-yellow animate-pulse' : 'bg-gray-100'}
-              `}
-            >
-              {match.homeScore}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="font-bold text-lg text-brand-dark line-clamp-1">{match.awayTeam}</span>
-            <span
-              className={`
-                font-bold text-2xl border border-black rounded-lg px-3 py-1 min-w-[3rem] text-center transition-colors
-                ${awayPulse ? 'bg-brand-yellow animate-pulse' : 'bg-gray-100'}
-              `}
-            >
-              {match.awayScore}
-            </span>
-          </div>
-        </div>
+            {/* Top Bar */}
+            <div className={`flex justify-between items-center px-4 py-2 border-b-[3px] border-black ${isLive ? 'bg-red-50' : 'bg-gray-50'}`}>
 
-        {/* Footer: Action */}
-        <div className="flex items-center justify-between mt-auto pt-4 border-t-2 border-gray-100 border-dashed">
-          <span className="text-xs text-gray-500 font-medium">
-            {new Date(match.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onWatch(match.id)}
-              disabled={isActive}
-              className={`
-                px-4 py-2 rounded-full font-bold text-sm border-2 border-black transition-all
-                ${isActive 
-                  ? 'bg-brand-blue text-black cursor-default opacity-100' 
-                  : 'bg-brand-yellow text-black hover:bg-yellow-300 active:translate-y-0.5'
-                }
-              `}
-            >
-              {actionLabel}
-            </button>
-            {isActive && (
-              <button
-                onClick={() => onUnwatch(match.id)}
-                className="px-3 py-2 rounded-full font-bold text-xs border-2 border-black bg-white hover:bg-gray-50 transition-all"
-              >
-                Close
-              </button>
-            )}
-          </div>
+                <div className="flex items-center gap-2">
+
+                    <span className="text-[10px] font-black bg-black text-white px-2 py-0.5 rounded uppercase">
+                        {match.sport}
+                    </span>
+
+                    {isLive && (
+                        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500 text-[10px] font-bold text-white uppercase animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            Live
+                        </span>
+                    )}
+                </div>
+
+                <span className="text-[11px] font-bold text-gray-600 uppercase italic">
+                    {match.status}
+                </span>
+            </div>
+
+            <div className="p-4">
+
+                {/* Score Section */}
+                <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-4 ${isCricket ? "mb-4" : "mb-6"}`}>
+
+                    {/* Home Team */}
+                    <div className="flex flex-col gap-1">
+
+                        <span className="text-sm font-black leading-tight uppercase line-clamp-2">
+                            {match.homeTeam}
+                        </span>
+
+                        <ScoreDisplay
+                            score={homeScore}
+                            wickets={homeWickets}
+                            overs={homeOvers}
+                            pulse={homePulse}
+                        />
+
+                    </div>
+
+                    {/* VS Badge */}
+                    <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full border-2 border-black bg-brand-yellow flex items-center justify-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                            <span className="text-[10px] font-black">VS</span>
+                        </div>
+                    </div>
+
+                    {/* Away Team */}
+                    <div className="flex flex-col items-end gap-1 text-right">
+
+                        <span className="text-sm font-black leading-tight uppercase line-clamp-2">
+                            {match.awayTeam}
+                        </span>
+
+                        <ScoreDisplay
+                            score={awayScore}
+                            wickets={awayWickets}
+                            overs={awayOvers}
+                            pulse={awayPulse}
+                        />
+
+                    </div>
+
+                </div>
+
+                {/* Footer Actions */}
+                <div className="flex items-center justify-between pt-3 border-t-2 border-black border-dashed">
+
+                    <div className="flex flex-col">
+
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                            Start Time
+                        </span>
+
+                        <span className="text-xs font-black">
+                            {new Date(match.startTime).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </span>
+
+                    </div>
+
+                    <div className="flex gap-2">
+
+                        {isActive && (
+                            <button
+                                onClick={() => onUnwatch(match.id)}
+                                className="px-3 py-1.5 rounded border-2 border-black bg-white text-[11px] font-black hover:bg-gray-100 active:translate-y-0.5 transition-all"
+                            >
+                                CLOSE
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => onWatch(match.id)}
+                            disabled={isActive}
+                            className={`
+                                px-4 py-1.5 rounded border-2 border-black text-[11px] font-black transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]
+                                ${isActive
+                                    ? 'bg-brand-blue cursor-default'
+                                    : 'bg-brand-yellow hover:bg-yellow-300 active:translate-y-0.5 active:shadow-none'
+                                }
+                            `}
+                        >
+                            {isActive ? 'WATCHING' : 'WATCH MATCH'}
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
         </div>
-      </div>
     );
 };

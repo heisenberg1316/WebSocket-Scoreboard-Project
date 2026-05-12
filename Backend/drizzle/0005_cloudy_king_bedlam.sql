@@ -1,0 +1,1 @@
+ALTER TABLE "matches" RENAME COLUMN "aways_total_balls" TO "away_total_balls";

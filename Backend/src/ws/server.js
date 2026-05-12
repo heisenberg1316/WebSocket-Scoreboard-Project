@@ -157,12 +157,17 @@ export function attachWebSocketServer(server) {
     wss.on('close', () => clearInterval(interval));
 
     function broadcastMatchCreated(match) {
-        console.log("inside braodcast match");
         broadcastToAll(wss, { type: 'match_created', data: match });
     }
 
     function broadcastCommentary(matchId, comment) {
         broadcastToMatch(matchId, { type: 'commentary', data: comment });
+        if(comment.sport === "cricket"){
+            broadcastToAll(wss, { type: 'score_update_cricket', matchId : comment.matchId,  data: comment });
+        }
+        else{
+            broadcastToAll(wss, { type: 'score_update_football', matchId : comment.matchId,  data: comment });
+        }
     }
 
     return { broadcastMatchCreated, broadcastCommentary };

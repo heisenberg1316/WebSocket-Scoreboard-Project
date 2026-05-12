@@ -1,21 +1,7 @@
-  import {
-      useCallback,
-      useEffect,
-      useRef,
-      useState
-  } from "react";
-  import {
-      fetchMatchCommentary,
-      fetchMatches
-  } from "../services/api";
-  import {
-      Commentary,
-      Match,
-      WSMessage
-  } from "../types";
-  import {
-      useWebSocket
-  } from "./useWebSocket";
+  import { useCallback, useEffect, useRef, useState } from "react";
+  import { fetchMatchCommentary, fetchMatches } from "../services/api";
+  import { Commentary, Match, WSMessage } from "../types";
+  import { useWebSocket } from "./useWebSocket";
 
   interface UseMatchData {
       matches: Match[];
@@ -34,45 +20,96 @@
   }
 
   export const useMatchData = (): UseMatchData => {
+      //states
       const [matches, setMatches] = useState < Match[] > ([]);
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState < string | null > (null);
       const [commentary, setCommentary] = useState < Commentary[] > ([]);
       const [isCommentaryLoading, setIsCommentaryLoading] = useState(false);
       const [wsError, setWsError] = useState < string | null > (null);
-      const [activeMatchId, setActiveMatchId] = useState < string | number | null > (
-          null,
-      );
+      const [activeMatchId, setActiveMatchId] = useState < string | number | null > (null);
       const [newMatchesCount, setNewMatchesCount] = useState(0);
+
+      //refs
       const latestMatchIdRef = useRef < string | number | null > (null);
       const subscribedMatchIdsRef = useRef(new Set < string > ());
       const hasLoadedRef = useRef(false);
       const knownMatchIdsRef = useRef(new Set < string > ());
-      const newMatchesTimeoutRef = useRef < ReturnType < typeof setTimeout > | null > (
-          null,
-      );
+      const newMatchesTimeoutRef = useRef < ReturnType < typeof setTimeout > | null > (null);
+
 
       const handleWSMessage = useCallback((msg: WSMessage) => {
           switch (msg.type) {
-              case "score_update":
-                  if (!subscribedMatchIdsRef.current.has(String(msg.matchId))) {
-                      return;
-                  }
-                  setMatches((prevMatches) =>
-                      prevMatches.map((m) => {
-                          // Loose equality check for ID (string vs number)
-                          // eslint-disable-next-line eqeqeq
-                          if (m.id == msg.matchId) {
-                              return {
-                                  ...m,
-                                  homeScore: msg.data.homeScore,
-                                  awayScore: msg.data.awayScore,
-                              };
-                          }
-                          return m;
-                      }),
-                  );
-                  break;
+              case "score_update_cricket":
+
+                    setMatches((prevMatches) =>
+                        prevMatches.map((m) => {
+
+                            if (m.id == msg.matchId && msg.data.eventType !== "match_start" && msg.data.eventType !== "match_end") {
+
+                                let isHome = msg.data.team.toLowerCase() === m.homeTeam.toLowerCase();
+                                const event = msg.data.eventType;
+
+                                let runs = msg.data.scoreDelta?.runs ?? 0;
+
+                                let balls = 1;
+
+                                if (msg.data.eventType === "wide" || msg.data.eventType === "no_ball") {
+                                    balls = 0; // extra ball
+                                    isHome = !isHome; //because from backend we are returning the team whose bowler bowl that ball
+                                }
+
+                                return {
+                                    ...m,
+
+                                    homeRuns: isHome ? (m.homeRuns ?? 0) + runs : m.homeRuns,
+                                    awayRuns: !isHome ? (m.awayRuns ?? 0) + runs : m.awayRuns,
+                                    
+                                    homeWickets:
+                                        !isHome && msg.data.eventType === "wicket"
+                                        ? (m.homeWickets ?? 0) + 1
+                                        : m.homeWickets,
+
+                                    awayWickets:
+                                        isHome && msg.data.eventType === "wicket"
+                                        ? (m.awayWickets ?? 0) + 1
+                                        : m.awayWickets,
+
+
+                                    homeTotalBalls:
+                                        ((isHome && (event==="run" || event==="four" || event==="six")) || (event === "wicket" && !isHome)) ? (m.homeTotalBalls ?? 0) + balls : m.homeTotalBalls,
+
+                                    awayTotalBalls:
+                                        ((!isHome && (event==="run" || event==="four" || event==="six")) || (event === "wicket" && isHome)) ? (m.awayTotalBalls ?? 0) + balls : m.awayTotalBalls,
+                                };
+                            }
+
+                            return m;
+                        })
+                    );
+
+                    break;
+
+              case "score_update_football":
+                    setMatches((prevMatches) =>
+                        prevMatches.map((m) => {
+                            if (m.id == msg.matchId && msg.data.eventType !== "period_start" && msg.data.eventType !== "period_end") {
+                                if (msg.data.eventType === "goal") {
+                                    console.log("msg is ", msg);
+                                    const isHome = msg.data.team.toLowerCase() === m.homeTeam.toLowerCase();
+                                    return {
+                                        ...m,
+                                        homeScore: isHome ? m.homeScore + (msg.data.scoreDelta.homeScore ?? 0) : m.homeScore,
+                                        awayScore: !isHome ? m.awayScore + (msg.data.scoreDelta.awayScore ?? 0) : m.awayScore
+                                    };
+                                }
+                                return m;
+                            }
+                            return m;
+                        })
+                    );
+                    break;
+
               case "match_created": {
                   const match = msg.data;
 
@@ -80,16 +117,13 @@
                       const exists = prev.some((m) => String(m.id) === String(match.id));
                       if (exists) return prev;
                       return [match, ...prev];
-                  });
-
+                    });
+                    
                   setNewMatchesCount((prev) => prev + 1);
                   break;
               }
               case "commentary": {
-                  if (
-                      latestMatchIdRef.current == null ||
-                      msg.data.matchId != latestMatchIdRef.current
-                  ) {
+                  if ( latestMatchIdRef.current == null || msg.data.matchId != latestMatchIdRef.current ) {
                       return;
                   }
                   const normalized = {
@@ -145,7 +179,13 @@
                           return {
                               ...match,
                               homeScore: prev.homeScore,
+                              homeRuns : prev.homeRuns,
+                              homeWickets : prev.homeWickets,
+                              homeTotalBalls : prev.homeTotalBalls,
                               awayScore: prev.awayScore,
+                              awayRuns : prev.awayRuns,
+                              awayWickets : prev.awayWickets,
+                              awayTotalBalls : prev.awayTotalBalls,
                           };
                       }
                       return match;
@@ -173,10 +213,7 @@
 
               nextMatches.forEach((match) => {
                   const matchId = String(match.id);
-                  if (
-                      subscribedMatchIdsRef.current.has(matchId) &&
-                      match.status.toLowerCase() === "finished"
-                  ) {
+                  if ( subscribedMatchIdsRef.current.has(matchId) && match.status.toLowerCase() === "finished" ) {
                       subscribedMatchIdsRef.current.delete(matchId);
                       unsubscribeMatch(match.id);
                       if (latestMatchIdRef.current == match.id) {
@@ -187,10 +224,12 @@
                       }
                   }
               });
-          } catch (err) {
+          }
+          catch (err) {
               const msg = err instanceof Error ? err.message : "Failed to load matches";
               setError(msg);
-          } finally {
+          }
+          finally {
               if (!hasLoadedRef.current) {
                   setIsLoading(false);
                   hasLoadedRef.current = true;
@@ -203,7 +242,7 @@
       }, [loadMatches]);
 
       // useEffect(() => {
-      //   polling for new match created after every 60 seconds
+      //   polling for new match created after every 60 seconds, instead we are using websocket
       //   const interval = setInterval(() => {
       //     loadMatches();
       //   }, 60000);

@@ -118,23 +118,41 @@ async function createMatch(seedMatch) {
             awayTeam: seedMatch.awayTeam,
             startTime,
             endTime,
-            homeScore: seedMatch.homeScore ?? 0,
-            awayScore: seedMatch.awayScore ?? 0,
+            homeScore: seedMatch.homeScore ?? null,
+            awayScore: seedMatch.awayScore ?? null,
+            homeRuns: seedMatch.homeRuns ?? null,
+            homeWickets: seedMatch.homeWickets ?? null,
+            homeTotalBalls: seedMatch.homeTotalBalls ?? null,
+            awayRuns: seedMatch.awayRuns ?? null,
+            awayWickets: seedMatch.awayWickets ?? null,
+            awayTotalBalls: seedMatch.awayTotalBalls ?? null,
         }),
     });
     if (!response.ok) {
         throw new Error(`Failed to create match: ${response.status}`);
     }
 
+    
     const responsePayload = await response.json();
-    console.log("Match HomeTeam, AwayTeam : ", responsePayload.data.homeTeam, "   ", responsePayload.data.awayTeam);
+    console.log(`🏁 Match created for ${responsePayload.data.homeTeam} vs ${responsePayload.data.awayTeam}`);
+
     return responsePayload.data;
 }
 
 async function insertCommentary(matchId, entry) {
+
     const payload = {
         message: entry.message ?? "Update",
     };
+
+    if(matchId !== undefined && matchId !== null){
+        payload.matchId = matchId;
+    }
+
+    if(entry.sport !== undefined && entry.sport !== null){
+        payload.sport = entry.sport;
+    }
+
     if (entry.minute !== undefined && entry.minute !== null) {
         payload.minute = entry.minute;
     }
@@ -147,11 +165,23 @@ async function insertCommentary(matchId, entry) {
     if (entry.eventType !== undefined && entry.eventType !== null) {
         payload.eventType = entry.eventType;
     }
+
+    if(entry.over !== undefined && entry.over !== null){
+        payload.over = entry.over;
+    }
+
+    if(entry.ball !== undefined && entry.ball !== null){
+        payload.ball = entry.ball;
+    }
+
     if (entry.actor !== undefined && entry.actor !== null) {
         payload.actor = entry.actor;
     }
     if (entry.team !== undefined && entry.team !== null) {
         payload.team = entry.team;
+    }
+    if(entry.scoreDelta !== undefined && entry.scoreDelta !== null){
+        payload.scoreDelta = entry.scoreDelta;
     }
     if (entry.metadata !== undefined && entry.metadata !== null) {
         payload.metadata = entry.metadata;
@@ -178,6 +208,7 @@ async function insertCommentary(matchId, entry) {
         body: JSON.stringify(payload),
     });
     if (!response.ok) {
+        console.log("body is ", payload);
         throw new Error(`Failed to create commentary: ${response.status}`);
     }
     const responsePayload = await response.json();
@@ -604,7 +635,7 @@ async function seed() {
     //     (remainingByMatchId.get(entry.matchId) || 0) + 1,
     //   );
     // }
-
+    
     for (let i = 0; i < randomizedFeed.length; i += 1) {
         const entry = randomizedFeed[i];
         const target = getMatchEntry(entry, matchMap);

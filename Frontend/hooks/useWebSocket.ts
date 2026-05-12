@@ -1,9 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-    WS_BASE_URL,
-    INITIAL_RECONNECT_DELAY,
-    MAX_RECONNECT_DELAY,
-} from "../constants";
+import { WS_BASE_URL, INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY } from "../constants";
 import { ConnectionStatus, WSMessage } from "../types";
 
 interface UseWebSocketReturn {
@@ -16,7 +12,7 @@ interface UseWebSocketReturn {
 
 const normalizeId = (matchId: string | number) => String(matchId);
 
-export const useWebSocket = ( onMessage: (msg: WSMessage) => void): UseWebSocketReturn => {
+export const useWebSocket = ( handleWSMessage: (msg: WSMessage) => void): UseWebSocketReturn => {
     const [status, setStatus] = useState<ConnectionStatus>("disconnected");
 
     const ws = useRef<WebSocket | null>(null);
@@ -25,18 +21,15 @@ export const useWebSocket = ( onMessage: (msg: WSMessage) => void): UseWebSocket
     const isIntentionalClose = useRef(false);
     const subscribedMatchIdsRef = useRef(new Set<string>());
 
-    const sendMessage = useCallback(
-        (message: WSMessage | Record<string, unknown>) => {
+    const sendMessage = useCallback((message: WSMessage | Record<string, unknown>) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             try {
-            ws.current.send(JSON.stringify(message));
+                ws.current.send(JSON.stringify(message));
             } catch (e) {
-            console.warn("[WebSocket] send failed", e);
+                console.warn("[WebSocket] send failed", e);
             }
         }
-        },
-        [],
-    );
+    },[]);
 
     // Core connect function
     const initConnection = useCallback(() => {
@@ -71,9 +64,9 @@ export const useWebSocket = ( onMessage: (msg: WSMessage) => void): UseWebSocket
                 // restore subscriptions if any
                 subscribedMatchIdsRef.current.forEach((matchId) => {
                     socket.send(
-                        JSON.stringify({
-                        type: "subscribe",
-                        matchId: Number(matchId),
+                            JSON.stringify({
+                            type: "subscribe",
+                            matchId: Number(matchId),
                         }),
                     );
                 });
@@ -83,7 +76,7 @@ export const useWebSocket = ( onMessage: (msg: WSMessage) => void): UseWebSocket
             socket.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    onMessage(data);
+                    handleWSMessage(data);
                 }
                 catch (e) {
                     console.error("[WebSocket] Failed to parse message:", e);
@@ -122,7 +115,7 @@ export const useWebSocket = ( onMessage: (msg: WSMessage) => void): UseWebSocket
             console.error("[WebSocket] Connection creation failed:", e);
             setStatus("error");
         }
-    }, [onMessage]);
+    }, [handleWSMessage]);
 
     // Public connect method
     const connectGlobal = useCallback(() => {
