@@ -12,8 +12,8 @@ const HOST = process.env.HOST || "0.0.0.0";
 const app = express();
 const server = http.createServer(app);
 const allowedOrigins = [
-  "http://localhost:3000",
-  "https://your-frontend-domain.com"
+    process.env.FRONTEND_URL,
+    "http://localhost:3000",
 ];
 
 app.use(cors({
